@@ -139,6 +139,7 @@ func BuildGSMPDUSessionEstablishmentAccept(smContext *SMContext) ([]byte, error)
 		// IPv4 DNS
 		if smContext.ProtocolConfigurationOptions.DNSIPv4Request {
 			errAddDNSServerIPv4Address := protocolConfigurationOptions.AddDNSServerIPv4Address(smContext.DNNInfo.DNS.IPv4Addr)
+			logger.GsmLog.Infof("Add DNS IPv4 Addr: %s", smContext.DNNInfo.DNS.IPv4Addr)
 			if errAddDNSServerIPv4Address != nil {
 				logger.GsmLog.Warnln("Error while adding DNS IPv4 Addr: ", errAddDNSServerIPv4Address)
 			}

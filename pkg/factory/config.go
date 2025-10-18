@@ -7,6 +7,7 @@ package factory
 import (
 	"errors"
 	"fmt"
+	"net"
 	"strconv"
 	"sync"
 	"time"
@@ -92,6 +93,7 @@ type Configuration struct {
 	T3592                *TimerValue          `yaml:"t3592" valid:"required"`
 	NwInstFqdnEncoding   bool                 `yaml:"nwInstFqdnEncoding" valid:"type(bool),optional"`
 	RequestedUnit        int32                `yaml:"requestedUnit,omitempty" valid:"optional"`
+	EasdfIp              net.IP               `yaml:"easdfIp,omitempty" valid:"ipv4,optional"`
 }
 
 type Logger struct {

@@ -112,6 +112,7 @@ func (p *Processor) HandlePDUSessionSMContextCreate(
 	} else {
 		if len(sessSubData) > 0 {
 			smContext.DnnConfiguration = sessSubData[0].DnnConfigurations[smContext.Dnn]
+			smContext.Log.Infof("Get SessionManagementSubscriptionData from UDM: %+v", smContext.DnnConfiguration)
 			// UP Security info present in session management subscription data
 			if smContext.DnnConfiguration.UpSecurity != nil {
 				smContext.UpSecurity = smContext.DnnConfiguration.UpSecurity
@@ -119,6 +120,12 @@ func (p *Processor) HandlePDUSessionSMContextCreate(
 		} else {
 			smContext.Log.Errorln("SessionManagementSubscriptionData from UDM is nil")
 		}
+	}
+
+	if smContext.DnnConfiguration.EasDiscoveryAuthorized {
+		smContext.ProtocolConfigurationOptions.DNSIPv4Request = true
+		smContext.DNNInfo.DNS.IPv4Addr = factory.SmfConfig.Configuration.EasdfIp
+		smContext.Log.Infof("EAS Discovery Authorized, use EAS-D IP: %s", smContext.DNNInfo.DNS.IPv4Addr)
 	}
 
 	var doSubscribe bool = false
@@ -243,6 +250,8 @@ func (p *Processor) HandlePDUSessionSMContextCreate(
 			&smf_errors.InsufficientResourceSliceDnn)
 		return
 	}
+
+	// add neasdf_dnscontext_create here
 
 	// generate goroutine to handle PFCP and
 	// reply PDUSessionSMContextCreate rsp immediately
