@@ -145,3 +145,19 @@ func SendUpPathChgEventExposureNotification(
 		logger.PduSessLog.Warnf("SMF Event Exposure Notification Unknown Error: %+v", err)
 	}
 }
+
+func (p *Processor) HandleDNSContextNotify(
+	c *gin.Context,
+	request models.DnsContextNotification, dnsContextId string,
+) {
+	logger.PduSessLog.Infoln("In HandleDNSContextNotify")
+
+	c.Status(http.StatusNoContent)
+
+	logger.ConsumerLog.Infof("DNS Context Notify Request Data: %+v", request.EventreportList)
+	dnsMsgId := request.EventreportList[0].DnsMsgId
+
+	go func() {
+		p.Consumer().SendDNSContextUpdate(context.Background(), dnsMsgId, dnsContextId)
+	}()
+}

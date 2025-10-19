@@ -56,7 +56,7 @@ func (s *neasdfService) BuildDnsContextCreateData(
 		return nil, fmt.Errorf("easDeploymentInfo is nil")
 	}
 
-	notifyURI := fmt.Sprintf("%s://%s:%d%s/dns-contexts/notify",
+	notifyURI := fmt.Sprintf("%s://%s:%d%s/dns-contexts/:dnsContextId",
 		smf_context.GetSelf().URIScheme,
 		smf_context.GetSelf().RegisterIPv4,
 		smf_context.GetSelf().SBIPort,
@@ -284,4 +284,49 @@ func (s *neasdfService) SendDNSContextCreate(ctx context.Context, smContext *smf
 	s.UEIpDNSContextIdMap[smContext.PDUAddress.String()] = res.Location[lastIndex+1:]
 
 	return res.Location[lastIndex+1:], nil
+}
+
+func (s *neasdfService) SendDNSContextUpdate(ctx context.Context, dnsMsgId string, dnsContextId string) error {
+	dnsReq := Neasdf_DNSContext.UpdateDnsContextRequest{
+		DnsContextId: &dnsContextId,
+	}
+
+	logger.ConsumerLog.Infoln("Send DNSContext Update Request to EASDF")
+
+	oneTimeDNSRule := models.DnsRule{
+		DnsMsgId: dnsMsgId,
+		ActionList: map[string]models.Action{
+			"oneTimeAction": {
+				ApplyAction: models.ApplyAction_FORWARD,
+				FwdParas: &models.ForwardingParameters{
+					DnsServerAddressInfo: &models.DnsServerAddressInfo{
+						DnsServerAddressList: []models.IpAddr{
+							{
+								Ipv4Addr: factory.SmfConfig.EasDeploymentInfo.LocalDNSServer.IPv4,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	dnsReq.PatchItem = []models.PatchItem{
+		{
+			Op:    "add",
+			Path:  "/bufferTrigger",
+			Value: oneTimeDNSRule,
+		},
+	}
+
+	easdfURI := "http://127.0.0.56:8000"
+
+	client := s.GetDNSContextClient(easdfURI)
+
+	_, err := client.IndividualDNSContextApi.UpdateDnsContext(ctx, &dnsReq)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

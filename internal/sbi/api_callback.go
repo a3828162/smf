@@ -34,7 +34,7 @@ func (s *Server) getCallbackRoutes() []Route {
 		{
 			Name:    "UE DNS Message Detect Informaction",
 			Method:  http.MethodPost,
-			Pattern: "/dns-contexts-notify",
+			Pattern: "/dns-contexts/:dnsContextId",
 			APIFunc: s.HTTPDNSContextNotify,
 		},
 	}
@@ -82,5 +82,20 @@ func (s *Server) HTTPChargingNotification(c *gin.Context) {
 
 func (s *Server) HTTPDNSContextNotify(c *gin.Context) {
 	logger.ConsumerLog.Infof("Received DNS Context Notify Callback\n")
-	c.Status(http.StatusNotImplemented)
+	// c.Status(http.StatusNotImplemented)
+	var req models.DnsContextNotification
+
+	requestBody, err := c.GetRawData()
+	if err != nil {
+		logger.ConsumerLog.Errorln("GetRawData failed")
+	}
+
+	err = openapi.Deserialize(&req, requestBody, APPLICATION_JSON)
+	if err != nil {
+		logger.ConsumerLog.Errorln("Deserialize request failed")
+	}
+
+	dnsContextId := c.Params.ByName("dnsContextId")
+
+	s.Processor().HandleDNSContextNotify(c, req, dnsContextId)
 }
