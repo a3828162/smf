@@ -252,6 +252,15 @@ func (p *Processor) HandlePDUSessionSMContextCreate(
 	}
 
 	// add neasdf_dnscontext_create here
+	ctx, _, oauthErr = smf_context.GetSelf().GetTokenCtx(models.ServiceName_NEASDF_DNSCONTEXT, models.NrfNfManagementNfType_EASDF)
+	if oauthErr != nil {
+		smContext.Log.Errorf("Get Token Context Error[%v]", oauthErr)
+		return
+	}
+	_, err = p.Consumer().SendDNSContextCreate(ctx, smContext)
+	if err != nil {
+		smContext.Log.Errorf("Send DNSContext Create Error[%v]", err)
+	}
 
 	// generate goroutine to handle PFCP and
 	// reply PDUSessionSMContextCreate rsp immediately

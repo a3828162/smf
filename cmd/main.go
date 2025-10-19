@@ -79,6 +79,10 @@ func action(cliCtx *cli.Context) error {
 	}
 	factory.SmfConfig = cfg
 
+	// logger.InitLog.Infof("SMF Config Info EASDeployment: %+v", factory.SmfConfig.EasDeploymentInfo)
+	// logger.InitLog.Infof("SMF Config Info DNAI: %+v", factory.SmfConfig.EasDeploymentInfo.Dnais[0].EasList[0])
+	// logger.InitLog.Infof("SMF Config Info BaselineDnsPattern: %+v", factory.SmfConfig.EasDeploymentInfo.BaselineDnsPatterns[0].DnsQueryMdt)
+
 	ueRoutingCfg, err := factory.ReadUERoutingConfig(cliCtx.String("uerouting"))
 	if err != nil {
 		sigCh <- nil

@@ -31,6 +31,12 @@ func (s *Server) getCallbackRoutes() []Route {
 			Pattern: "/:notifyUri",
 			APIFunc: s.HTTPChargingNotification,
 		},
+		{
+			Name:    "UE DNS Message Detect Informaction",
+			Method:  http.MethodPost,
+			Pattern: "/dns-contexts-notify",
+			APIFunc: s.HTTPDNSContextNotify,
+		},
 	}
 }
 
@@ -72,4 +78,9 @@ func (s *Server) HTTPChargingNotification(c *gin.Context) {
 	smContextRef := strings.Split(c.Params.ByName("notifyUri"), "_")[1]
 
 	s.Processor().HandleChargingNotification(c, req, smContextRef)
+}
+
+func (s *Server) HTTPDNSContextNotify(c *gin.Context) {
+	logger.ConsumerLog.Infof("Received DNS Context Notify Callback\n")
+	c.Status(http.StatusNotImplemented)
 }

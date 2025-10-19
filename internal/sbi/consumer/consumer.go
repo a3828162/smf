@@ -3,6 +3,7 @@ package consumer
 import (
 	"github.com/free5gc/openapi/amf/Communication"
 	"github.com/free5gc/openapi/chf/ConvergedCharging"
+	"github.com/free5gc/openapi/easdf/DNSContext"
 	"github.com/free5gc/openapi/nrf/NFDiscovery"
 	"github.com/free5gc/openapi/nrf/NFManagement"
 	"github.com/free5gc/openapi/pcf/SMPolicyControl"
@@ -22,6 +23,7 @@ type Consumer struct {
 	*npcfService
 	*nudmService
 	*nnrfService
+	*neasdfService
 }
 
 func NewConsumer(smf app.App) (*Consumer, error) {
@@ -59,6 +61,12 @@ func NewConsumer(smf app.App) (*Consumer, error) {
 	c.npcfService = &npcfService{
 		consumer:               c,
 		SMPolicyControlClients: make(map[string]*SMPolicyControl.APIClient),
+	}
+
+	c.neasdfService = &neasdfService{
+		consumer:            c,
+		DNSContextClients:   make(map[string]*DNSContext.APIClient),
+		UEIpDNSContextIdMap: make(map[string]string),
 	}
 
 	return c, nil

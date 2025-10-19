@@ -60,7 +60,7 @@ func (s *npcfService) SendSMPolicyAssociationCreate(smContext *smf_context.SMCon
 			client = s.getSMPolicyControlClient(service.ApiPrefix)
 		}
 	}
-
+	
 	if client == nil {
 		return "", nil, errors.Errorf("smContext not selected PCF")
 	}

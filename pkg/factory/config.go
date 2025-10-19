@@ -40,15 +40,22 @@ const (
 )
 
 type Config struct {
-	Info          *Info          `yaml:"info" valid:"required"`
-	Configuration *Configuration `yaml:"configuration" valid:"required"`
-	Logger        *Logger        `yaml:"logger" valid:"required"`
+	Info              *Info              `yaml:"info" valid:"required"`
+	Configuration     *Configuration     `yaml:"configuration" valid:"required"`
+	Logger            *Logger            `yaml:"logger" valid:"required"`
+	EasDeploymentInfo *EasDeploymentInfo `yaml:"easDeploymentInfo,omitempty" valid:"optional"`
 	sync.RWMutex
 }
 
 func (c *Config) Validate() (bool, error) {
 	if configuration := c.Configuration; configuration != nil {
 		if result, err := configuration.validate(); err != nil {
+			return result, err
+		}
+	}
+
+	if easDeploymentInfo := c.EasDeploymentInfo; easDeploymentInfo != nil {
+		if result, err := easDeploymentInfo.validate(); err != nil {
 			return result, err
 		}
 	}
@@ -807,4 +814,257 @@ func (c *Config) GetCertKeyPath() string {
 	c.RLock()
 	defer c.RUnlock()
 	return c.Configuration.Sbi.Tls.Key
+}
+
+// EasDeploymentInfo represents EAS deployment information for a specific DNN and S-NSSAI
+type EasDeploymentInfo struct {
+	Dnn                 string                `yaml:"dnn" valid:"type(string),minstringlength(1),optional"`
+	Snssai              *models.Snssai        `yaml:"snssai,omitempty" valid:"optional"`
+	InternalGroupId     string                `yaml:"internalGroupId,omitempty" valid:"type(string),optional"`
+	Description         string                `yaml:"description,omitempty" valid:"type(string),optional"`
+	LocalDNSServer      *LocalDNSServer       `yaml:"localDNSServer,omitempty" valid:"optional"`
+	Dnais               []*DnaiInfo           `yaml:"dnais,omitempty" valid:"optional"`
+	BaselineDnsPatterns []*BaselineDnsPattern `yaml:"baselineDnsPatterns,omitempty" valid:"optional"`
+}
+
+func (e *EasDeploymentInfo) validate() (bool, error) {
+	if e.Snssai != nil {
+		if result := (e.Snssai.Sst >= 0 && e.Snssai.Sst <= 255); !result {
+			err := errors.New("Invalid sNssai.Sst: " + strconv.Itoa(int(e.Snssai.Sst)) + ", should be in range 0~255.")
+			return false, err
+		}
+
+		if e.Snssai.Sd != "" {
+			if result := govalidator.StringMatches(e.Snssai.Sd, "^[0-9A-Fa-f]{6}$"); !result {
+				err := errors.New("Invalid sNssai.Sd: " + e.Snssai.Sd +
+					", should be 3 bytes hex string and in range 000000~FFFFFF.")
+				return false, err
+			}
+		}
+	}
+
+	if e.LocalDNSServer != nil {
+		if result, err := e.LocalDNSServer.validate(); err != nil {
+			return result, err
+		}
+	}
+
+	for _, dnai := range e.Dnais {
+		if result, err := dnai.validate(); err != nil {
+			return result, err
+		}
+	}
+
+	for _, pattern := range e.BaselineDnsPatterns {
+		if result, err := pattern.validate(); err != nil {
+			return result, err
+		}
+	}
+
+	result, err := govalidator.ValidateStruct(e)
+	return result, appendInvalid(err)
+}
+
+// LocalDNSServer represents local DNS server configuration
+type LocalDNSServer struct {
+	IPv4 string `yaml:"ipv4,omitempty" valid:"ipv4,optional"`
+	IPv6 string `yaml:"ipv6,omitempty" valid:"ipv6,optional"`
+}
+
+func (l *LocalDNSServer) validate() (bool, error) {
+	result, err := govalidator.ValidateStruct(l)
+	return result, appendInvalid(err)
+}
+
+// DnaiInfo represents a DNAI (DN Access Identifier) with its EAS list
+type DnaiInfo struct {
+	Id           string     `yaml:"id" valid:"type(string),minstringlength(1),required"`
+	Description  string     `yaml:"description,omitempty" valid:"type(string),optional"`
+	LocationInfo string     `yaml:"locationInfo,omitempty" valid:"type(string),optional"`
+	EcsSubnet    string     `yaml:"ecsSubnet,omitempty" valid:"cidr,optional"`
+	EasList      []*EasInfo `yaml:"easList,omitempty" valid:"optional"`
+}
+
+func (d *DnaiInfo) validate() (bool, error) {
+	govalidator.TagMap["cidr"] = govalidator.Validator(func(str string) bool {
+		return govalidator.IsCIDR(str)
+	})
+
+	for _, eas := range d.EasList {
+		if result, err := eas.validate(); err != nil {
+			return result, err
+		}
+	}
+
+	result, err := govalidator.ValidateStruct(d)
+	return result, appendInvalid(err)
+}
+
+// EasInfo represents an Edge Application Server
+type EasInfo struct {
+	Name       string      `yaml:"name" valid:"type(string),minstringlength(1),required"`
+	Fqdn       string      `yaml:"fqdn,omitempty" valid:"type(string),optional"`
+	IPv4Addr   string      `yaml:"ipv4Addr,omitempty" valid:"ipv4,optional"`
+	IPv6Addr   string      `yaml:"ipv6Addr,omitempty" valid:"ipv6,optional"`
+	AppId      string      `yaml:"appId,omitempty" valid:"type(string),optional"`
+	Capability *Capability `yaml:"capability,omitempty" valid:"optional"`
+}
+
+func (e *EasInfo) validate() (bool, error) {
+	if e.Capability != nil {
+		if result, err := e.Capability.validate(); err != nil {
+			return result, err
+		}
+	}
+
+	result, err := govalidator.ValidateStruct(e)
+	return result, appendInvalid(err)
+}
+
+// Capability represents the capability of an Edge Application Server
+type Capability struct {
+	CPU int `yaml:"CPU,omitempty" valid:"int,optional"`
+	RAM int `yaml:"RAM,omitempty" valid:"int,optional"`
+	NET int `yaml:"NET,omitempty" valid:"int,optional"`
+}
+
+func (c *Capability) validate() (bool, error) {
+	result, err := govalidator.ValidateStruct(c)
+	return result, appendInvalid(err)
+}
+
+// BaselineDnsPattern represents baseline DNS pattern configuration
+type BaselineDnsPattern struct {
+	Id          string       `yaml:"id" valid:"type(string),minstringlength(1),required"`
+	Type        string       `yaml:"type" valid:"dnsPatternType,required"` // QUERY or RESPONSE
+	DnsQueryMdt *DnsQueryMdt `yaml:"dnsQueryMdt,omitempty" valid:"optional"`
+	DnsRspMdt   *DnsRspMdt   `yaml:"dnsRspMdt,omitempty" valid:"optional"`
+	DnsAction   []*DnsAction `yaml:"dnsAction,omitempty" valid:"optional"`
+}
+
+func (b *BaselineDnsPattern) validate() (bool, error) {
+	govalidator.TagMap["dnsPatternType"] = govalidator.Validator(func(str string) bool {
+		return str == "QUERY" || str == "RESPONSE"
+	})
+
+	if b.Type == "QUERY" && b.DnsQueryMdt == nil {
+		return false, errors.New("dnsQueryMdt is required when type is QUERY")
+	}
+
+	if b.Type == "RESPONSE" && b.DnsRspMdt == nil {
+		return false, errors.New("dnsRspMdt is required when type is RESPONSE")
+	}
+
+	if b.DnsQueryMdt != nil {
+		if result, err := b.DnsQueryMdt.validate(); err != nil {
+			return result, err
+		}
+	}
+
+	if b.DnsRspMdt != nil {
+		if result, err := b.DnsRspMdt.validate(); err != nil {
+			return result, err
+		}
+	}
+
+	// for _, action := range b.DnsAction {
+	// 	if result, err := action.validate(); err != nil {
+	// 		return result, err
+	// 	}
+	// }
+
+	result, err := govalidator.ValidateStruct(b)
+	return result, appendInvalid(err)
+}
+
+// DnsQueryMdt represents DNS Query Message Detection Template
+type DnsQueryMdt struct {
+	MdtId        string         `yaml:"mdtId" valid:"type(string),minstringlength(1),required"`
+	FqdnPatterns []*FqdnPattern `yaml:"fqdnPatterns,omitempty" valid:"optional"`
+}
+
+func (d *DnsQueryMdt) validate() (bool, error) {
+	for _, pattern := range d.FqdnPatterns {
+		if result, err := pattern.validate(); err != nil {
+			return result, err
+		}
+	}
+
+	result, err := govalidator.ValidateStruct(d)
+	return result, appendInvalid(err)
+}
+
+// DnsRspMdt represents DNS Response Message Detection Template
+type DnsRspMdt struct {
+	MdtId             string         `yaml:"mdtId" valid:"type(string),minstringlength(1),required"`
+	FqdnPatterns      []*FqdnPattern `yaml:"fqdnPatterns,omitempty" valid:"optional"`
+	EasIpv4AddrRanges []*IpAddrRange `yaml:"easIpv4AddrRanges,omitempty" valid:"optional"`
+	EasIpv6AddrRanges []*IpAddrRange `yaml:"easIpv6AddrRanges,omitempty" valid:"optional"`
+}
+
+func (d *DnsRspMdt) validate() (bool, error) {
+	for _, pattern := range d.FqdnPatterns {
+		if result, err := pattern.validate(); err != nil {
+			return result, err
+		}
+	}
+
+	for _, ipRange := range d.EasIpv4AddrRanges {
+		if result, err := ipRange.validate(); err != nil {
+			return result, err
+		}
+	}
+
+	for _, ipRange := range d.EasIpv6AddrRanges {
+		if result, err := ipRange.validate(); err != nil {
+			return result, err
+		}
+	}
+
+	result, err := govalidator.ValidateStruct(d)
+	return result, appendInvalid(err)
+}
+
+// FqdnPattern represents FQDN pattern (exact or regex)
+type FqdnPattern struct {
+	Exact string `yaml:"exact,omitempty" valid:"type(string),optional"`
+	Regx  string `yaml:"regx,omitempty" valid:"type(string),optional"`
+}
+
+func (f *FqdnPattern) validate() (bool, error) {
+	if f.Exact == "" && f.Regx == "" {
+		return false, errors.New("either exact or regx must be specified in FqdnPattern")
+	}
+
+	result, err := govalidator.ValidateStruct(f)
+	return result, appendInvalid(err)
+}
+
+// IpAddrRange represents an IP address range
+type IpAddrRange struct {
+	Start string `yaml:"start" valid:"ip,required"`
+	End   string `yaml:"end" valid:"ip,required"`
+}
+
+func (i *IpAddrRange) validate() (bool, error) {
+	result, err := govalidator.ValidateStruct(i)
+	return result, appendInvalid(err)
+}
+
+// DnsAction represents DNS handling action
+type DnsAction struct {
+	ActionId         string `yaml:"actionId" valid:"type(string),minstringlength(1),required"`
+	ApplyAction      string `yaml:"applyAction" valid:"applyActionType,required"` // REPORT, FORWARD, CONTROL
+	ReportingOnceInd bool   `yaml:"reportingOnceInd,omitempty" valid:"type(bool),optional"`
+	EcsOption        string `yaml:"ecsOption,omitempty" valid:"type(string),optional"`
+	DnsServerAddr    string `yaml:"dnsServerAddr,omitempty" valid:"ip,optional"`
+}
+
+func (d *DnsAction) validate() (bool, error) {
+	govalidator.TagMap["applyActionType"] = govalidator.Validator(func(str string) bool {
+		return str == "REPORT" || str == "FORWARD" || str == "CONTROL"
+	})
+
+	result, err := govalidator.ValidateStruct(d)
+	return result, appendInvalid(err)
 }
