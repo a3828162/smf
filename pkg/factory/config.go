@@ -101,6 +101,20 @@ type Configuration struct {
 	NwInstFqdnEncoding   bool                 `yaml:"nwInstFqdnEncoding" valid:"type(bool),optional"`
 	RequestedUnit        int32                `yaml:"requestedUnit,omitempty" valid:"optional"`
 	EasdfIp              net.IP               `yaml:"easdfIp,omitempty" valid:"ipv4,optional"`
+	Experiment           *Experiment          `yaml:"experiment,omitempty" valid:"optional"`
+	MtlfType             MtlfType             `yaml:"mtlfType,omitempty" valid:"required,in(flask)"`
+	Flask                *Flask               `yaml:"flask,omitempty"`
+}
+
+type MtlfType string
+
+type Experiment struct {
+	Type string `yaml:"type,omitempty" valid:"optional"`
+	// EAS  []string `yaml:"eas,omitempty" valid:"optional"`
+}
+
+type Flask struct {
+	Endpoint string `yaml:"endpoint" valid:"required,type(string)"`
 }
 
 type Logger struct {

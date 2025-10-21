@@ -24,6 +24,7 @@ type Consumer struct {
 	*nudmService
 	*nnrfService
 	*neasdfService
+	*nnwdafService
 }
 
 func NewConsumer(smf app.App) (*Consumer, error) {
@@ -61,6 +62,12 @@ func NewConsumer(smf app.App) (*Consumer, error) {
 	c.npcfService = &npcfService{
 		consumer:               c,
 		SMPolicyControlClients: make(map[string]*SMPolicyControl.APIClient),
+	}
+
+	c.neasdfService = &neasdfService{
+		consumer:            c,
+		DNSContextClients:   make(map[string]*DNSContext.APIClient),
+		UEIpDNSContextIdMap: make(map[string]string),
 	}
 
 	c.neasdfService = &neasdfService{

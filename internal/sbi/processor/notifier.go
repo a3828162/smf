@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -12,6 +13,7 @@ import (
 	"github.com/free5gc/openapi/smf/EventExposure"
 	smf_context "github.com/free5gc/smf/internal/context"
 	"github.com/free5gc/smf/internal/logger"
+	"github.com/free5gc/smf/pkg/factory"
 )
 
 func (p *Processor) HandleChargingNotification(
@@ -155,9 +157,54 @@ func (p *Processor) HandleDNSContextNotify(
 	c.Status(http.StatusNoContent)
 
 	logger.ConsumerLog.Infof("DNS Context Notify Request Data: %+v", request.EventreportList)
-	dnsMsgId := request.EventreportList[0].DnsMsgId
 
-	go func() {
-		p.Consumer().SendDNSContextUpdate(context.Background(), dnsMsgId, dnsContextId)
-	}()
+	if request.EventreportList[0].DnsMsgId == "" {
+		logger.ConsumerLog.Infof("Only Report not Buffered DNS Message, no need to update DNS Context")
+		return
+	}
+
+	if request.EventreportList[0].DnsQueryReport.Fqdn == "" {
+		go p.DecisionMultipleDNAI(context.Background(), &request.EventreportList[0], &dnsContextId)
+	} else {
+		go p.Consumer().SendDNSContextUpdate(context.Background(), &request.EventreportList[0], &dnsContextId)
+	}
+}
+
+func (p *Processor) DecisionMultipleDNAI(ctx context.Context, eventReport *models.DnsContextEventReport, dnsContextId *string) error {
+
+	switch factory.SmfConfig.Configuration.Experiment.Type {
+	case "Random":
+		logger.ProcessorLog.Infof("Experiment Type: %s", factory.SmfConfig.Configuration.Experiment.Type)
+		index := time.Now().UnixNano() % 3
+		logger.ProcessorLog.Infof("Random index: %d", index)
+		targetIp := factory.SmfConfig.EasDeploymentInfo.Dnais[index].EasList[0].IPv4Addr
+		p.Consumer().SendEASDecision(ctx, &targetIp, *eventReport, *dnsContextId)
+	case "RoundRobin":
+		logger.ProcessorLog.Infof("Experiment Type: %s", factory.SmfConfig.Configuration.Experiment.Type)
+		p.roundRobinMu.Lock()
+		index := p.roundRobin
+		p.roundRobin = (p.roundRobin + 1) % p.roundRobinMax
+		p.roundRobinMu.Unlock()
+		logger.ProcessorLog.Infof("RoundRobin index: %d", index)
+		targetIp := factory.SmfConfig.EasDeploymentInfo.Dnais[index].EasList[0].IPv4Addr
+		p.Consumer().SendEASDecision(ctx, &targetIp, *eventReport, *dnsContextId)
+	case "ShortestPath":
+
+	case "LLM":
+		nwdafAnalytics, err := p.Consumer().GetNwdafAnalytics()
+
+		edgeResource, err := p.Consumer().GetEdgeResouceInfo(ctx, "http://127.0.0.163:8000")
+
+		decision, err := p.Decisioner.GetDecision(nwdafAnalytics.DnPerfInfos[0].DnPerf, edgeResource)
+		if err != nil {
+			logger.ProcessorLog.Errorf("GetDecision error: %+v", err)
+			return err
+		}
+
+		logger.ProcessorLog.Infof("GetDecision: %+v", decision)
+	}
+
+	// TODO: implement update DNAI decision logic to EASDF
+
+	return nil
 }

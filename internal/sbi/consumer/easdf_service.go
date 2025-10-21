@@ -281,16 +281,70 @@ func (s *neasdfService) SendDNSContextCreate(ctx context.Context, smContext *smf
 	logger.ConsumerLog.Infoln("Response Location: ", res.Location)
 	logger.ConsumerLog.Infoln("Create DNSCtx Success")
 
+	logger.ConsumerLog.Debugf("Map UE IP %s to DNS Context ", smContext.PDUAddress.String())
+	logger.ConsumerLog.Debugf("Last Index: %d", lastIndex)
+	logger.ConsumerLog.Debugf("DNS Context ID: %s", res.Location[lastIndex+1:])
+	// if s.UEIpDNSContextIdMap == nil {
+	// 	logger.ConsumerLog.Infof("Initializing UEIpDNSContextIdMap")
+	// 	s.UEIpDNSContextIdMap = make(map[string]string)
+	// }
 	s.UEIpDNSContextIdMap[smContext.PDUAddress.String()] = res.Location[lastIndex+1:]
 
 	return res.Location[lastIndex+1:], nil
 }
 
-func (s *neasdfService) SendDNSContextUpdate(ctx context.Context, dnsMsgId string, dnsContextId string) error {
+func (s *neasdfService) SendEASDecision(ctx context.Context, target *string, eventReport models.DnsContextEventReport, dnsCotnextId string) error {
+
 	dnsReq := Neasdf_DNSContext.UpdateDnsContextRequest{
-		DnsContextId: &dnsContextId,
+		DnsContextId: &dnsCotnextId,
 	}
 
+	dnsMsgId := eventReport.DnsMsgId
+	logger.ConsumerLog.Infoln("Send EAS Decision to EASDF")
+
+	oneTimeDNSRule := models.DnsRule{
+		DnsMsgId: dnsMsgId,
+		ActionList: map[string]models.Action{
+			"oneTimeAction": {
+				ApplyAction: models.ApplyAction_FORWARD,
+				FwdParas: &models.ForwardingParameters{
+					DnsServerAddressInfo: &models.DnsServerAddressInfo{
+						DnsServerAddressList: []models.IpAddr{
+							{
+								Ipv4Addr: *target,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	dnsReq.PatchItem = []models.PatchItem{
+		{
+			Op:    "add",
+			Path:  "/bufferTriggerDecision",
+			Value: oneTimeDNSRule,
+		},
+	}
+
+	easdfURI := "http://127.0.0.56:8000"
+
+	client := s.GetDNSContextClient(easdfURI)
+
+	_, err := client.IndividualDNSContextApi.UpdateDnsContext(ctx, &dnsReq)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *neasdfService) SendDNSContextUpdate(ctx context.Context, eventReport *models.DnsContextEventReport, dnsContextId *string) error {
+	dnsReq := Neasdf_DNSContext.UpdateDnsContextRequest{
+		DnsContextId: dnsContextId,
+	}
+
+	dnsMsgId := eventReport.DnsMsgId
 	logger.ConsumerLog.Infoln("Send DNSContext Update Request to EASDF")
 
 	oneTimeDNSRule := models.DnsRule{
@@ -311,12 +365,45 @@ func (s *neasdfService) SendDNSContextUpdate(ctx context.Context, dnsMsgId strin
 		},
 	}
 
+	// addDNSRule := models.DnsRule{
+	// 	DnsRuleId:  "updateAddRule",
+	// 	Precedence: 2,
+	// 	DnsQueryMdtList: map[string]models.DnsQueryMdt{
+	// 		"Added_Query_MDT": {
+	// 			FqdnPatternList: []models.FqdnPatternMatchingRule{
+	// 				{
+	// 					Regex: eventReport.DnsQueryReport.Fqdn,
+	// 				},
+	// 			},
+	// 		},
+	// 	},
+	// 	ActionList: map[string]models.Action{
+	// 		"addedAction": {
+	// 			ApplyAction: models.ApplyAction_FORWARD,
+	// 			FwdParas: &models.ForwardingParameters{
+	// 				DnsServerAddressInfo: &models.DnsServerAddressInfo{
+	// 					DnsServerAddressList: []models.IpAddr{
+	// 						{
+	// 							Ipv4Addr: factory.SmfConfig.EasDeploymentInfo.LocalDNSServer.IPv4,
+	// 						},
+	// 					},
+	// 				},
+	// 			},
+	// 		},
+	// 	},
+	// }
+
 	dnsReq.PatchItem = []models.PatchItem{
 		{
 			Op:    "add",
 			Path:  "/bufferTrigger",
 			Value: oneTimeDNSRule,
 		},
+		// {
+		// 	Op:    "add",
+		// 	Path:  "/dnsRules",
+		// 	Value: addDNSRule,
+		// },
 	}
 
 	easdfURI := "http://127.0.0.56:8000"

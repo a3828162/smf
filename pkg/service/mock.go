@@ -10,6 +10,7 @@
 package service
 
 import (
+	c "context"
 	reflect "reflect"
 
 	context "github.com/free5gc/smf/internal/context"
@@ -54,6 +55,20 @@ func (m *MockSmfAppInterface) Config() *factory.Config {
 func (mr *MockSmfAppInterfaceMockRecorder) Config() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Config", reflect.TypeOf((*MockSmfAppInterface)(nil).Config))
+}
+
+// Config mocks base method.
+func (m *MockSmfAppInterface) CancelContext() c.Context {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CancelContext")
+	ret0, _ := ret[0].(*c.Context)
+	return *ret0
+}
+
+// Config indicates an expected call of Config.
+func (mr *MockSmfAppInterfaceMockRecorder) CancelContext() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CancelContext", reflect.TypeOf((*MockSmfAppInterface)(nil).CancelContext))
 }
 
 // Consumer mocks base method.

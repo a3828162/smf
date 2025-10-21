@@ -12,20 +12,22 @@ const (
 )
 
 var (
-	Log         *logrus.Logger
-	NfLog       *logrus.Entry
-	MainLog     *logrus.Entry
-	InitLog     *logrus.Entry
-	CfgLog      *logrus.Entry
-	CtxLog      *logrus.Entry
-	GinLog      *logrus.Entry
-	SBILog      *logrus.Entry
-	ConsumerLog *logrus.Entry
-	GsmLog      *logrus.Entry
-	PfcpLog     *logrus.Entry
-	PduSessLog  *logrus.Entry
-	ChargingLog *logrus.Entry
-	UtilLog     *logrus.Entry
+	Log          *logrus.Logger
+	NfLog        *logrus.Entry
+	MainLog      *logrus.Entry
+	InitLog      *logrus.Entry
+	CfgLog       *logrus.Entry
+	CtxLog       *logrus.Entry
+	GinLog       *logrus.Entry
+	SBILog       *logrus.Entry
+	ConsumerLog  *logrus.Entry
+	GsmLog       *logrus.Entry
+	PfcpLog      *logrus.Entry
+	PduSessLog   *logrus.Entry
+	ChargingLog  *logrus.Entry
+	UtilLog      *logrus.Entry
+	DecisionLog  *logrus.Entry
+	ProcessorLog *logrus.Entry
 )
 
 func init() {
@@ -48,4 +50,6 @@ func init() {
 	PduSessLog = NfLog.WithField(logger_util.FieldCategory, "PduSess")
 	ChargingLog = NfLog.WithField(logger_util.FieldCategory, "Charging")
 	UtilLog = NfLog.WithField(logger_util.FieldCategory, "Util")
+	DecisionLog = NfLog.WithField(logger_util.FieldCategory, "Decision")
+	ProcessorLog = NfLog.WithField(logger_util.FieldCategory, "Processor")
 }
