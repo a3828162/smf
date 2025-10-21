@@ -163,7 +163,7 @@ func (p *Processor) HandleDNSContextNotify(
 		return
 	}
 
-	if request.EventreportList[0].DnsQueryReport.Fqdn == "" {
+	if request.EventreportList[0].DnsRspReport != nil {
 		go p.DecisionMultipleDNAI(context.Background(), &request.EventreportList[0], &dnsContextId)
 	} else {
 		go p.Consumer().SendDNSContextUpdate(context.Background(), &request.EventreportList[0], &dnsContextId)
@@ -172,12 +172,16 @@ func (p *Processor) HandleDNSContextNotify(
 
 func (p *Processor) DecisionMultipleDNAI(ctx context.Context, eventReport *models.DnsContextEventReport, dnsContextId *string) error {
 
+	easIpAddresses := eventReport.DnsRspReport.EasIpv4Addresses
+
 	switch factory.SmfConfig.Configuration.Experiment.Type {
 	case "Random":
 		logger.ProcessorLog.Infof("Experiment Type: %s", factory.SmfConfig.Configuration.Experiment.Type)
 		index := time.Now().UnixNano() % 3
 		logger.ProcessorLog.Infof("Random index: %d", index)
-		targetIp := factory.SmfConfig.EasDeploymentInfo.Dnais[index].EasList[0].IPv4Addr
+		logger.ProcessorLog.Infof("EAS IP Addresses: %+v", easIpAddresses)
+		targetIp := easIpAddresses[index]
+		logger.ProcessorLog.Infof("Selected EAS IP Address: %s", targetIp)
 		p.Consumer().SendEASDecision(ctx, &targetIp, *eventReport, *dnsContextId)
 	case "RoundRobin":
 		logger.ProcessorLog.Infof("Experiment Type: %s", factory.SmfConfig.Configuration.Experiment.Type)
@@ -186,7 +190,9 @@ func (p *Processor) DecisionMultipleDNAI(ctx context.Context, eventReport *model
 		p.roundRobin = (p.roundRobin + 1) % p.roundRobinMax
 		p.roundRobinMu.Unlock()
 		logger.ProcessorLog.Infof("RoundRobin index: %d", index)
-		targetIp := factory.SmfConfig.EasDeploymentInfo.Dnais[index].EasList[0].IPv4Addr
+		logger.ProcessorLog.Infof("EAS IP Addresses: %+v", easIpAddresses)
+		targetIp := easIpAddresses[index]
+		logger.ProcessorLog.Infof("Selected EAS IP Address: %s", targetIp)
 		p.Consumer().SendEASDecision(ctx, &targetIp, *eventReport, *dnsContextId)
 	case "ShortestPath":
 

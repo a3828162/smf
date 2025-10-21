@@ -306,23 +306,15 @@ func (s *neasdfService) SendEASDecision(ctx context.Context, target *string, eve
 		DnsMsgId: dnsMsgId,
 		ActionList: map[string]models.Action{
 			"oneTimeAction": {
-				ApplyAction: models.ApplyAction_FORWARD,
-				FwdParas: &models.ForwardingParameters{
-					DnsServerAddressInfo: &models.DnsServerAddressInfo{
-						DnsServerAddressList: []models.IpAddr{
-							{
-								Ipv4Addr: *target,
-							},
-						},
-					},
-				},
+				ApplyAction:     models.ApplyAction_FORWARD,
+				DecisionAddress: *target,
 			},
 		},
 	}
 	dnsReq.PatchItem = []models.PatchItem{
 		{
 			Op:    "add",
-			Path:  "/bufferTriggerDecision",
+			Path:  "/bufferTrigger",
 			Value: oneTimeDNSRule,
 		},
 	}
