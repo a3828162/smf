@@ -28,6 +28,10 @@ type Processor struct {
 	roundRobin    int64
 	roundRobinMax int64
 	roundRobinMu  sync.Mutex
+
+	randSlice []int64
+	randMax   int64
+	randIndex int64
 }
 
 func NewProcessor(smf ProcessorSmf) (*Processor, error) {
@@ -48,6 +52,10 @@ func NewProcessor(smf ProcessorSmf) (*Processor, error) {
 	p.roundRobin = 0
 	p.roundRobinMax = 3
 	p.roundRobinMu = sync.Mutex{}
+
+	p.randSlice = []int64{0, 1, 1, 1, 2, 0}
+	p.randMax = 6
+	p.randIndex = 0
 
 	return p, nil
 }

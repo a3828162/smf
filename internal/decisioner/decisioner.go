@@ -15,7 +15,7 @@ const (
 
 type Decisioner interface {
 	Start() error
-	GetDecision(any, any) (any, error)
+	GetDecision(ctx context.Context, data1 any, data2 any, data3 any) (any, error)
 
 	// // PostNewData() is a function to handle any data collected from NFs
 	// // and process it to json format and send it to MTLF server

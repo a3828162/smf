@@ -3,8 +3,8 @@ package processor
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -14,6 +14,7 @@ import (
 	smf_context "github.com/free5gc/smf/internal/context"
 	"github.com/free5gc/smf/internal/logger"
 	"github.com/free5gc/smf/pkg/factory"
+	smf_model "github.com/free5gc/smf/pkg/models"
 )
 
 func (p *Processor) HandleChargingNotification(
@@ -177,12 +178,36 @@ func (p *Processor) DecisionMultipleDNAI(ctx context.Context, eventReport *model
 	switch factory.SmfConfig.Configuration.Experiment.Type {
 	case "Random":
 		logger.ProcessorLog.Infof("Experiment Type: %s", factory.SmfConfig.Configuration.Experiment.Type)
-		index := time.Now().UnixNano() % 3
+		index := rand.Intn(3)
+		// index := p.randSlice[p.randIndex]
+		// p.randIndex = (p.randIndex + 1) % p.randMax
 		logger.ProcessorLog.Infof("Random index: %d", index)
 		logger.ProcessorLog.Infof("EAS IP Addresses: %+v", easIpAddresses)
 		targetIp := easIpAddresses[index]
 		logger.ProcessorLog.Infof("Selected EAS IP Address: %s", targetIp)
+
+		// // test
+		// nadafAnalytics, err := p.Consumer().GetNwdafAnalytics()
+		// if err != nil {
+		// 	logger.ProcessorLog.Errorf("GetNwdafAnalytics error: %+v", err)
+		// 	return err
+		// }
+		// edgeResource, err := p.Consumer().GetEdgeResouceInfo(ctx, "http://127.0.0.163:8000")
+		// if err != nil {
+		// 	logger.ProcessorLog.Errorf("GetEdgeResouceInfo error: %+v", err)
+		// 	return err
+		// }
+
+		// decision, err := p.Decisioner.GetDecision(ctx, &nadafAnalytics.DnPerfInfos[0],
+		// 	&edgeResource.EdgeResourceInfos, &factory.SmfConfig.EasDeploymentInfo.Dnais)
+		// if err != nil {
+		// 	logger.ProcessorLog.Errorf("GetDecision error: %+v", err)
+		// }
+
+		// logger.ProcessorLog.Infof("GetDecision: %+v", decision)
+
 		p.Consumer().SendEASDecision(ctx, &targetIp, *eventReport, *dnsContextId)
+
 	case "RoundRobin":
 		logger.ProcessorLog.Infof("Experiment Type: %s", factory.SmfConfig.Configuration.Experiment.Type)
 		p.roundRobinMu.Lock()
@@ -196,18 +221,93 @@ func (p *Processor) DecisionMultipleDNAI(ctx context.Context, eventReport *model
 		p.Consumer().SendEASDecision(ctx, &targetIp, *eventReport, *dnsContextId)
 	case "ShortestPath":
 
-	case "LLM":
-		nwdafAnalytics, err := p.Consumer().GetNwdafAnalytics()
+		logger.ProcessorLog.Infof("Experiment Type: %s", factory.SmfConfig.Configuration.Experiment.Type)
+		targetIp := easIpAddresses[0]
+		logger.ProcessorLog.Infof("Selected EAS IP Address: %s", targetIp)
+		p.Consumer().SendEASDecision(ctx, &targetIp, *eventReport, *dnsContextId)
 
-		edgeResource, err := p.Consumer().GetEdgeResouceInfo(ctx, "http://127.0.0.163:8000")
+	case "SmallestLatency":
 
-		decision, err := p.Decisioner.GetDecision(nwdafAnalytics.DnPerfInfos[0].DnPerf, edgeResource)
+		logger.ProcessorLog.Infof("Experiment Type: %s", factory.SmfConfig.Configuration.Experiment.Type)
+		nadafAnalytics, err := p.Consumer().GetNwdafAnalytics()
 		if err != nil {
-			logger.ProcessorLog.Errorf("GetDecision error: %+v", err)
+			logger.ProcessorLog.Errorf("GetNwdafAnalytics error: %+v", err)
+			return err
+		}
+		dnPerf := nadafAnalytics.DnPerfInfos[0]
+		if len(dnPerf.DnPerf) == 0 {
+			logger.ProcessorLog.Warnf("No DNAI Performance Data, use RoundRobin as default")
+			p.roundRobinMu.Lock()
+			p.roundRobin = 0
+			p.roundRobinMu.Unlock()
+		}
+
+		if p.roundRobin < 3 {
+			p.roundRobinMu.Lock()
+			index := p.roundRobin
+			p.roundRobin++
+			p.roundRobinMu.Unlock()
+			targetIp := easIpAddresses[index]
+			logger.ProcessorLog.Infof("Selected EAS IP Address: %s", targetIp)
+			p.Consumer().SendEASDecision(ctx, &targetIp, *eventReport, *dnsContextId)
+			return nil
+		}
+
+		targetEdgeId := ""
+		minDelay := int32(1<<31 - 1)
+		for _, edgePerf := range dnPerf.DnPerf {
+			if minDelay > edgePerf.PerfData.AvePacketDelay {
+				minDelay = edgePerf.PerfData.AvePacketDelay
+				targetEdgeId = edgePerf.Dnai
+			}
+		}
+		logger.ProcessorLog.Infof("Selected Edge ID: %s", targetEdgeId)
+		index := func(id string) int {
+			switch id {
+			case "edge1":
+				return 2
+			case "edge2":
+				return 1
+			case "edge3":
+				return 0
+			default:
+				return -1
+			}
+		}(targetEdgeId)
+
+		targetIp := easIpAddresses[index]
+		logger.ProcessorLog.Infof("Selected EAS IP Address: %s", targetIp)
+		p.Consumer().SendEASDecision(ctx, &targetIp, *eventReport, *dnsContextId)
+
+	case "LLM":
+		// test
+		nadafAnalytics, err := p.Consumer().GetNwdafAnalytics()
+		if err != nil {
+			logger.ProcessorLog.Errorf("GetNwdafAnalytics error: %+v", err)
+			return err
+		}
+		edgeResource, err := p.Consumer().GetEdgeResouceInfo(ctx, "http://127.0.0.163:8000")
+		if err != nil {
+			logger.ProcessorLog.Errorf("GetEdgeResouceInfo error: %+v", err)
 			return err
 		}
 
-		logger.ProcessorLog.Infof("GetDecision: %+v", decision)
+		decisionData, err := p.Decisioner.GetDecision(ctx, &nadafAnalytics.DnPerfInfos[0],
+			&edgeResource.EdgeResourceInfos, &factory.SmfConfig.EasDeploymentInfo.Dnais)
+		if err != nil {
+			logger.ProcessorLog.Errorf("GetDecision error: %+v", err)
+		}
+
+		logger.ProcessorLog.Infof("GetDecision: %+v", decisionData)
+
+		decision, ok := decisionData.(smf_model.APIResponse)
+		if !ok {
+			logger.ProcessorLog.Errorf("GetDecision type assertion failed")
+			return fmt.Errorf("GetDecision type assertion failed")
+		}
+		logger.ProcessorLog.Infof("Selected EAS IP Address: %s", decision.Decision.TargetIPv4)
+
+		p.Consumer().SendEASDecision(ctx, &decision.Decision.TargetIPv4, *eventReport, *dnsContextId)
 	}
 
 	// TODO: implement update DNAI decision logic to EASDF

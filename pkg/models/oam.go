@@ -42,3 +42,21 @@ type DiskMetric struct {
 	ReadBpsMean  float64 `json:"readBpsMean,omitempty"`
 	WriteBpsMean float64 `json:"writeBpsMean,omitempty"`
 }
+
+// === 1) 定義回傳資料結構 ===
+type Decision struct {
+	SelectedEAS    string `json:"selectedEAS"`
+	TargetEdgeId   string `json:"targetEdgeId"`
+	TargetIPv4     string `json:"targetIPv4"`
+	CpuRatio       string `json:"cpuRatio"` // 例: "27%"
+	Delay          string `json:"delay"`    // 例: "4 ms"
+	CurrentUEs     int    `json:"currentUEs"`
+	ExpectedImpact string `json:"expectedImpact"` // none | minimal | moderate | high
+	Reason         string `json:"reason"`
+}
+
+type APIResponse struct {
+	Status         string   `json:"status"` // "success" | "error"
+	Decision       Decision `json:"decision"`
+	ProcessingTime string   `json:"processing_time"`
+}

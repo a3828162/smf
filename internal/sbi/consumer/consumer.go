@@ -1,11 +1,15 @@
 package consumer
 
 import (
+	"crypto/tls"
+	"net/http"
+
 	"github.com/free5gc/openapi/amf/Communication"
 	"github.com/free5gc/openapi/chf/ConvergedCharging"
 	"github.com/free5gc/openapi/easdf/DNSContext"
 	"github.com/free5gc/openapi/nrf/NFDiscovery"
 	"github.com/free5gc/openapi/nrf/NFManagement"
+	Nnwdaf_AnalyticsInfo "github.com/free5gc/openapi/nwdaf/AnalyticsInfo"
 	"github.com/free5gc/openapi/pcf/SMPolicyControl"
 	"github.com/free5gc/openapi/smf/PDUSession"
 	"github.com/free5gc/openapi/udm/SubscriberDataManagement"
@@ -70,10 +74,14 @@ func NewConsumer(smf app.App) (*Consumer, error) {
 		UEIpDNSContextIdMap: make(map[string]string),
 	}
 
-	c.neasdfService = &neasdfService{
-		consumer:            c,
-		DNSContextClients:   make(map[string]*DNSContext.APIClient),
-		UEIpDNSContextIdMap: make(map[string]string),
+	c.nnwdafService = &nnwdafService{
+		consumer:             c,
+		analyticsInfoClients: make(map[string]*Nnwdaf_AnalyticsInfo.APIClient),
+		edgeResouceInfoClients: &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			},
+		},
 	}
 
 	return c, nil
